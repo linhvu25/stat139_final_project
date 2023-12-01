@@ -1,0 +1,30 @@
+---
+title: "Stat139_Final_Project"
+author: 
+-"Brice Laurent"
+-"Linh Vu"
+-"Aissata Bah"
+date: "2023-11-30"
+output: pdf_document
+---
+
+```{r}
+data_clean_2021 = data_clean[data_clean$year == 2021,]
+
+#baseline using overall ROL as predictors
+model0 = lm(hdi ~ wjp.rule + Region, data = data_clean_2021)
+plot(model0)
+
+#using the individual categorical averages as predictors
+model1 = lm(hdi~factor.1 +factor.2 +factor.3 +factor.4 +factor.5 +factor.6 +factor.7 + factor.8 + Region, data = data_clean_2021)
+plot(model1)
+
+#random intercept and slope model
+library(lme4)
+model2 = lmer(hdi ~ wjp.rule + (1 + wjp.rule || Region), data = data_clean_2021)
+
+model3 = lmer(hdi~factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 + (1 + factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 || Region), data = data_clean_2021)
+
+AIC(model0, model1, model2, model3)
+```
+
