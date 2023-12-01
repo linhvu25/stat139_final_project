@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load Libraries
 library(reshape2)
 library(dplyr)
+library(ggplot2)
 
 # Load Data
 HDR = read.csv("./data/HDR.csv")
@@ -53,8 +54,19 @@ data <- merged[, names(keep)[keep]]
 
 data = data[,!(names(data)==c("Country","Country_year"))]
 
+colnames(data)[37:89] <- tolower(substring(colnames(data)[37:89],1,8))
+
+for(i in 37:89){
+  if(substring(colnames(data)[i],1,1) == "x"){
+    colnames(data)[i] <- substring(colnames(data)[i],1,nchar(colnames(data)[i])-4)
+  }
+}
+
 write.csv(data,"./data/data_clean.csv")
 ```
 
+```{r}
+data <- read.csv("./data/data_clean.csv")
+```
 
 
