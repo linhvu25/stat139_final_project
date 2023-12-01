@@ -68,6 +68,7 @@ merged = inner_join(HDR_clean_cast, ROL_clean, by = c("iso3" = "Country.Code", "
 # Remove columns with more thn 10% NA values
 keep <- colMeans((is.na(merged))) < 0.1
 data <- merged[, names(keep)[keep]]
+data$year <- as.ordered(data$year)
 
 # Rename columns
 colnames(data) <- tolower(colnames(data))
