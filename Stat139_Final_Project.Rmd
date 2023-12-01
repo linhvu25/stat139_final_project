@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load Libraries
 library(reshape2)
 library(dplyr)
+library(ggplot2)
+library(vtree)
 
 # Load Data
 HDR = read.csv("./data/HDR.csv")
@@ -70,13 +72,22 @@ merged = inner_join(HDR_clean_cast, ROL_clean, by = c("iso3" = "Country.Code", "
 keep <- colMeans((is.na(merged))) < 0.1
 data <- merged[, names(keep)[keep]]
 
+# Rename columns
+colnames(data) <- tolower(colnames(data))
+colnames(data)[37:89] <- substring(colnames(data)[37:89],1,8)
+
+for(i in 37:89){
+  if(substring(colnames(data)[i],1,1) == "x"){
+    colnames(data)[i] <- substring(colnames(data)[i],1,nchar(colnames(data)[i])-4)
+  }
+}
+
 data = data[,!(names(data)==c("Country","Country_year"))]
 
 write.csv(data,"./data/data_clean.csv")
 ```
 
 ```{r}
-<<<<<<< HEAD
 data <- read.csv("./data/data_clean.csv")
 
 # structure of dataset
