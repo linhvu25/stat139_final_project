@@ -104,12 +104,21 @@ ggplot(aes(hdi), data=data) +
   geom_histogram(col="white") +
   labs(title="Distribution of HDI by Regions")
 
+ggplot(aes(wjp.rule), data=data) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of ROL")
+
+ggplot(aes(wjp.rule), data=data) + 
+  facet_wrap(~Region) +
+  geom_histogram(col="white") +
+  labs(title="Distribution of ROL by Regions")
+
 # scatter plot
 ggplot(aes(wjp.rule, hdi, color=Region), data=data) +
   geom_point() +
   labs(title="HDI vs ROL index, by Regions")
 
-ggplot(aes(wjp.rule, hdi, color=Region), data=data) +
+ggplot(aes(hdi, wjp.rule, color=Region), data=data) +
   geom_point() +
   labs(title="ROL index vs HDI, by Regions")
 
