@@ -12,24 +12,49 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r,message=F}
+# Load Libraries
+library(reshape2)
+library(dplyr)
+
 # Load Data
 HDR = read.csv("./data/HDR.csv")
 ROL = read.csv("./data/ROL.csv")
 ```
 
-```{r}
+```{r, warning=F}
 # Clean Data
-ROL_countries = unique(ROL$Country)
-
-HDR_countries = unique(HDR$country)
+ROL_countries = unique(ROL$Country.Code)
+HDR_countries = unique(HDR$iso3)
 
 ROL_countries[!ROL_countries%in%HDR_countries]
-HDR_countries[!HDR_countries%in%HDR_countries]
+HDR_countries[!HDR_countries%in%ROL_countries]
+
+# Remove Countries that are not include in both datasets
+shared_countries = ROL_countries[ROL_countries!= c("XKX","")]
+ROL_clean = ROL[ROL$Country.Code%in%shared_countries,]
+ROL_clean$Year = as.numeric(ROL_clean$Year)
+HDR_clean = HDR[HDR$iso3%in%shared_countries,]
+
+# Format HDR
+HDR_clean = HDR_clean[,!(names(HDR_clean)==c("hdicode","region"))]
+HDR_clean_melt = melt(HDR_clean)
+HDR_clean_melt$variable = as.character(HDR_clean_melt$variable)
+HDR_clean_melt$year = as.numeric(substr(HDR_clean_melt$variable, nchar(HDR_clean_melt$variable) - 3, nchar(HDR_clean_melt$variable)))
+HDR_clean_melt$variable = substr(HDR_clean_melt$variable, 1, nchar(HDR_clean_melt$variable) - 5)
+HDR_clean_cast = dcast(HDR_clean_melt, iso3 + country + year ~variable)
+
+# Merge HDR and ROL
+merged = inner_join(HDR_clean_cast, ROL_clean, by = c("iso3" = "Country.Code", "year" = "Year"))
+
+# Remove columns with more thn 10% NA values
+keep <- colMeans((is.na(merged))) < 0.1
+data <- merged[, names(keep)[keep]]
+
+data = data[,!(names(data)==c("Country","Country_year"))]
+
+write.csv(data,"./data/data_clean.csv")
 ```
 
-```{r}
-
-```
 
 
