@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load Libraries
 library(reshape2)
 library(dplyr)
+library(ggplot2)
+library(vtree)
 
 # Load Data
 HDR = read.csv("./data/HDR.csv")
@@ -67,13 +69,65 @@ merged = inner_join(HDR_clean_cast, ROL_clean, by = c("iso3" = "Country.Code", "
 keep <- colMeans((is.na(merged))) < 0.1
 data <- merged[, names(keep)[keep]]
 
+# Rename columns
+colnames(data) <- tolower(colnames(data))
+colnames(data)[37:89] <- substring(colnames(data)[37:89],1,8)
+
+for(i in 37:89){
+  if(substring(colnames(data)[i],1,1) == "x"){
+    colnames(data)[i] <- substring(colnames(data)[i],1,nchar(colnames(data)[i])-4)
+  }
+}
+
 data = data[,!(names(data)==c("Country","Country_year"))]
 
 write.csv(data,"./data/data_clean.csv")
 ```
 
 ```{r}
-# EDA
+data <- read.csv("./data/data_clean.csv")
 
+# structure of dataset
+vtree(data, "year")
+vtree(data, "Region")
+
+# histogram
+ggplot(aes(hdi), data=data) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of HDI")
+
+ggplot(aes(hdi), data=data) + 
+  facet_wrap(~Region) +
+  geom_histogram(col="white") +
+  labs(title="Distribution of HDI by Regions")
+
+# scatter plot
+ggplot(aes(wjp.rule, hdi, color=Region), data=data) +
+  geom_point() +
+  labs(title="HDI vs ROL index, by Regions")
+
+ggplot(aes(wjp.rule, hdi, color=Region), data=data) +
+  geom_point() +
+  labs(title="ROL index vs HDI, by Regions")
+
+# boxplot
+ggplot(aes(Region, hdi), data=data) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 25, hjust=1)) +
+  labs(title="How HDIs vary across Regions")
+
+ggplot(aes(Region, wjp.rule), data=data) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 25, hjust=1)) +
+  labs(title="How ROL indices vary across Regions")
+
+# spaghetti plot
+ggplot(aes(year, wjp.rule, group = country, col=Region), data=data) +
+  geom_line() +
+  labs(title="ROL over time across Regions")
+
+ggplot(aes(year, hdi, group = country, col=Region), data=data) +
+  geom_line() +
+  labs(title="HDI over time across Regions")
 ```
 
