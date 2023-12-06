@@ -80,7 +80,7 @@ for(i in 37:89){
   }
 }
 
-data = data[,!(names(data)==c("Country","Country_year"))]
+data = data[,!(names(data)==c("Country","Country_year", "country.1", "country_year"))]
 
 write.csv(data,"./data/data_clean.csv")
 ```
@@ -90,7 +90,7 @@ data <- read.csv("./data/data_clean.csv")
 
 # structure of dataset
 vtree(data, "year")
-vtree(data, "Region")
+vtree(data, "region")
 
 # histogram
 ggplot(aes(hdi), data=data) +
@@ -130,5 +130,14 @@ ggplot(aes(year, wjp.rule, group = country, col=Region), data=data) +
 ggplot(aes(year, hdi, group = country, col=Region), data=data) +
   geom_line() +
   labs(title="HDI over time across Regions")
+
+# correlation heatmap
+cormat <- round(cor(data[,!(names(data)%in%c("iso3","country","year","region"))], use = "na.or.complete"),2)
+melted_cormat <- melt(cormat)
+ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) +  
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), space = "Lab", name="Pearson\nCorrelation") +
+  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank()) +
+  ggtitle("Correlation Heatmap, all Variables")
 ```
 

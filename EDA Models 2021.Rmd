@@ -9,6 +9,7 @@ output: pdf_document
 ---
 
 ```{r}
+data_clean <- read.csv("./data/data_clean.csv")
 data_clean_2021 = data_clean[data_clean$year == 2021,]
 
 #baseline using overall ROL as predictors
