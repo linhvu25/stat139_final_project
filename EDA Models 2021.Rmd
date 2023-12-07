@@ -5,64 +5,82 @@ date: "2023-11-30"
 output: pdf_document
 ---
 
-```{r corr}
+```{r library and data}
+library(lme4)
+
+# load data
 data_clean <- read.csv("data/data_clean.csv")
+
+# subset to 2021 data only
 data_clean_2021 = data_clean[data_clean$year == 2021,]
-df = data_clean_2021[2:278,]
+df = data_clean_2021[2:138,]
+```
+
+
+```{r corr}
+# determine 1 representative variable from each of the 8 categories
 
 # which(colnames(df) == "x1.1")
 # which(colnames(df) == "x1.6")
-cor(data_clean_2021[,41:46], use="na.or.complete")
+cor(df[,40:45], use="na.or.complete")
 
 # which(colnames(df) == "x2.1")
 # which(colnames(df) == "x2.4")
-cor(data_clean_2021[,48:51], use="na.or.complete")
+cor(df[,47:50], use="na.or.complete")
 
 # which(colnames(df) == "x3.1")
 # which(colnames(df) == "x3.4")
-cor(data_clean_2021[,53:56], use="na.or.complete")
+cor(df[,52:55], use="na.or.complete")
 
 # which(colnames(df) == "x4.1")
 # which(colnames(df) == "x4.8")
-cor(data_clean_2021[,58:65], use="na.or.complete")
+cor(df[,57:64], use="na.or.complete")
 
 # which(colnames(df) == "x5.1")
 # which(colnames(df) == "x5.3")
-cor(data_clean_2021[,67:69], use="na.or.complete")
+cor(df[,66:68], use="na.or.complete")
 
 # which(colnames(df) == "x6.1")
 # which(colnames(df) == "x6.5")
-cor(data_clean_2021[,71:75], use="na.or.complete")
+cor(df[,70:74], use="na.or.complete")
 
 # less correlation
 # which(colnames(df) == "x7.1")
 # which(colnames(df) == "x7.7")
-cor(data_clean_2021[,77:83], use="na.or.complete")
+cor(df[,76:82], use="na.or.complete")
 
 # which(colnames(df) == "x8.1")
 # which(colnames(df) == "x8.6")
-cor(data_clean_2021[,85:90], use="na.or.complete")
+cor(df[,84:89], use="na.or.complete")
+
+# subset data
+cor(df[, c("x1.6", "x2.1", "x3.2", "x4.2", "x5.2", "x5.3", "x6.4", "x7.5", "x7.3", "x8.5")], use="na.or.complete")
+
+# chosen variables
+cor(df[,c("x3.2", "x5.2", "x5.3", "x7.5", "x8.5")], use="na.or.complete")
 ```
 
-
-```{r}
-data_clean <- read.csv("./data/data_clean.csv")
-data_clean_2021 = data_clean[data_clean$year == 2021,]
-
+```{r exploratory models}
 #baseline using overall ROL as predictors
 model0 = lm(hdi ~ wjp.rule + region, data = df)
 plot(model0)
 
-#using the individual categorical averages as predictors
+# using the individual categorical averages as predictors
 model1 = lm(hdi~factor.1 +factor.2 +factor.3 +factor.4 +factor.5 +factor.6 +factor.7 + factor.8 + region, data = df)
 plot(model1)
 
-#random intercept and slope model
-library(lme4)
+# random intercept and slope model
 model2 = lmer(hdi ~ wjp.rule + (1 + wjp.rule || region), data = df)
 
 model3 = lmer(hdi~factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 + (1 + factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 || region), data = df)
 
 AIC(model0, model1, model2, model3)
+```
+
+```{r models using selected vars}
+sub_df <- df[, c("country", "hdi", "region", "x3.2", "x5.2", "x7.5", "x8.5")]
+
+summary(mod1 <- lm(hdi~x3.2 + x5.2 + x7.5 + x8.5 + region, data = sub_df))
+plot(mod1)
 ```
 
