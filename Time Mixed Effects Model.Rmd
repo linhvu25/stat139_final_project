@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
 library(lme4)
+library(broom.mixed)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -53,7 +54,7 @@ time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_
 ```
 
 ```{r}
-# Makes Plots
-
-
+# Make Plots
+residuals = augment(time_mixed_effects)
+ggplot(data = residuals, aes(x=.rownames, y = .resid)) + geom_point(aes(color = region))
 ```
