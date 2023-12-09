@@ -19,6 +19,7 @@ library(ggplot2)
 library(lme4)
 library(broom.mixed)
 library(lmerTest)
+library(tibble)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -62,5 +63,29 @@ summary(mixed_effects)
 
 ```{r}
 # Determine importance of each variable
-range(pca$rotation[,"PC1"])
+TopPCs_loadings_squared <- pca$rotation[,seq(1,5)]^2
+TopPCs_loadings_squared_long <- as.data.frame(as.table(TopPCs_loadings_squared))
+colnames(TopPCs_loadings_squared_long) <- c("Variable", "Principal_Component", "Loading")
+ggplot(TopPCs_loadings_squared_long, aes(x = Principal_Component, y = Loading)) +
+  geom_boxplot(outlier.size = 0) +
+  geom_jitter(aes(color = Variable)) +
+  labs(title = "Boxplot of Loadings by Principal Component",
+       x = "Principal Component",
+       y = "Loading")
+
+rowSums(TopPCs_loadings_squared)[order(-rowSums(TopPCs_loadings_squared))]
+
+TopPCs_loadings_squared_grouped = as.data.frame(TopPCs_loadings_squared) 
+TopPCs_loadings_squared_grouped$Row_Labels = row.names(TopPCs_loadings_squared)
+TopPCs_loadings_squared_grouped = TopPCs_loadings_squared_grouped %>%
+  mutate(First_Digit = as.numeric(gsub("\\D*(\\d).*", "\\1", TopPCs_loadings_squared_grouped$Row_Labels))) %>%
+  select(-Row_Labels)
+TopPCs_loadings_squared_grouped = TopPCs_loadings_squared_grouped %>%
+  group_by(First_Digit) %>%
+  summarise(across(everything(), sum, na.rm = TRUE)) %>%
+  column_to_rownames(var = "First_Digit")
+
+rowSums(TopPCs_loadings_squared_grouped)[order(-rowSums(TopPCs_loadings_squared_grouped))]
 ```
+
+The squared loadings represent the proportion of the variance of the variable that is accounted for by the corresponding principal component.
