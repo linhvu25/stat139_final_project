@@ -18,6 +18,7 @@ library(dplyr)
 library(ggplot2)
 library(lme4)
 library(broom.mixed)
+library(lmerTest)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -45,24 +46,71 @@ selected_columns[selected_columns$year == "2017-2018", "year"] = "2017.5"
 selected_columns$year = as.numeric(selected_columns$year)
 selected_columns$years_from_2000 = selected_columns$year - 2000
 
-time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000|region),data=selected_columns)
+time_mixed_effects = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
 ```
 
 ```{r}
 # Determine Significance of Coefficients
+fixed_effects = summary(time_mixed_effects)$coefficients
+fixed_effects
+```
+Degrees of Freedom=Total number of observations−Number of fixed effects−Number of estimated variance components
 
+Bonferroni Correction: $\alpha$=0.05/6=0.00833
+
+```{r}
+# Importance of Considering Region
+time_mixed_effects_noRegion = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000||country),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noRegion)
+
+# Importance of Considering Year
+time_mixed_effects_noYear = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noYear)
 ```
 
 ```{r}
 # Make Plots
+country_coef = as.data.frame(coef(time_mixed_effects)$country)
+country_coef = merge(country_coef, selected_columns[,c("country", "region")], by.x=c("row.names"), by.y=c("country"))
+
+ggplot(data = country_coef, aes(x=`(Intercept)`, y = years_from_2000)) + geom_point(aes(color=region))
+
 residuals = augment(time_mixed_effects)
-ggplot(data = residuals, aes(x=.rownames, y = .resid)) +
+ggplot(data = residuals, aes(x=.fitted, y = .resid)) +
   geom_point(aes(color = region)) +
   theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
   geom_hline(yintercept = 0) +
-  labs(y="Residuals", x="Country")
+  labs(y="Residuals", x="FItted HDI")
+```
 
-time_mixed_effects_country = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3||region)+(1+years_from_2000||country),data=selected_columns)
 
-ggplot(data = coef(time_mixed_effects_country)$country, aes(x=`(Intercept)`, y = years_from_2000)) + geom_point()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Old wrong model
+time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000|region),data=selected_columns)
+
+
+residuals = augment(time_mixed_effects)
+ggplot(data = residuals, aes(x=.fitted, y = .resid)) +
+  geom_point(aes(color = region)) +
+  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 0) +
+  labs(y="Residuals", x="Fitted HDI")
 ```
