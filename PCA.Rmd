@@ -1,0 +1,66 @@
+---
+title: "PCA"
+author: 
+-"Aissata Bah"
+-"Brice Laurent"
+-"Linh Vu"
+date: "2023-12-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,message=F}
+# Load Libraries
+library(dplyr)
+library(ggplot2)
+library(lme4)
+library(broom.mixed)
+library(lmerTest)
+
+data = read.csv("./data/data_clean.csv")
+```
+
+
+```{r}
+# Impute missing values with of values in the same region
+selected_columns_pca = select(data, c(starts_with("x"), "region"))
+selected_columns_pca = selected_columns_pca %>%
+  rename(x8.7=x8.7..due.process.of.the.law.and.rights.of.the.accused)
+selected_columns_pca_imputed = selected_columns_pca %>%
+  group_by(region) %>%
+  mutate_all(~ ifelse(is.na(.), mean(., na.rm = TRUE), .))
+selected_columns_pca_imputed = selected_columns_pca_imputed[, -c(1,ncol(selected_columns_pca_imputed))]
+
+# Extract Principle Components of Rule of Law Variables
+pca = prcomp(selected_columns_pca_imputed, scale. = TRUE)
+variance_explained = (pca$sdev^2) / sum(pca$sdev^2)
+```
+
+
+```{r}
+# Visualize Principle Components
+PC1and2 = as.data.frame(cbind(pca$x[,c(1,2)], data$country))
+ggplot(data = PC1and2,aes(x=as.numeric(PC1), y=as.numeric(PC2))) + geom_point(aes(color = data$country)) + theme(legend.position = "none")
+```
+
+```{r}
+# Fit mixed linear model with top 5 principal components
+selected_columns_data = data[, c("country","year", "region", "hdi")]
+selected_columns_data[selected_columns_data$year == "2012-2013", "year"] = "2012.5"
+selected_columns_data[selected_columns_data$year == "2017-2018", "year"] = "2017.5"
+selected_columns_data$year = as.numeric(selected_columns_data$year)
+selected_columns_data$years_from_2000 = selected_columns_data$year - 2000
+TopPCs = as.data.frame(cbind(pca$x[,seq(1,5)], selected_columns_data))
+                  
+mixed_effects = lmer(hdi~PC1+PC2+PC3+PC4+PC5+(1+PC1+PC2+PC3+PC4+PC5|region)+(1+years_from_2000||country),data=TopPCs)
+
+summary(mixed_effects)
+```
+
+```{r}
+# Determine importance of each variable
+range(pca$rotation[,"PC1"])
+```
