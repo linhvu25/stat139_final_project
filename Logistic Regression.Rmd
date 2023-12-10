@@ -1,0 +1,83 @@
+---
+title: "Logistic Regression"
+author: 
+  -"Aissata Bah"
+  -"Brice Laurent"
+  -"Linh Vu"
+date: "2023-12-10"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+From the UN website, a country is classified as low human development when HDI is less than 0.550. So, I will create a logisitic regression for this using our choosen variables over the countries in 2021.
+
+```{r}
+# Load Libraries
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+
+data = read.csv("./data/data_clean.csv")
+```
+
+```{r}
+selected_columns = data[, c("country","year", "region", "hdi", "x1.6","x3.2", "x5.1", "x6.4", "x7.3")]
+selected_columns_2021 = selected_columns[selected_columns$year == "2021",]
+selected_columns_2021$low_HD = as.numeric(selected_columns_2021$hdi <= 0.550)
+
+# Fit logisitic regression
+logreg = glm(low_HD~x1.6+x3.2+x5.1+x6.4+x7.3+region,data=selected_columns_2021,family="binomial")
+summary(logreg)
+```
+
+```{r}
+logreg_noRegion = glm(low_HD~x1.6+x3.2+x5.1+x6.4+x7.3,data=selected_columns_2021,family="binomial")
+
+anova(logreg_noRegion, logreg, test = "LRT")
+```
+
+```{r}
+# Plot regression
+dummy_x1.6 = seq(0,max(selected_columns_2021$x1.6,na.rm=T),0.01)
+dummy_x3.2 = seq(0,max(selected_columns_2021$x3.2,na.rm=T),0.01)
+dummy_x5.1 = seq(0,max(selected_columns_2021$x5.1,na.rm=T),0.01)
+dummy_x6.4 = seq(0,max(selected_columns_2021$x6.4,na.rm=T),0.01)
+dummy_x7.3 = seq(0,max(selected_columns_2021$x7.3,na.rm=T),0.01)
+
+average_x1.6 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x3.2 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x5.1 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x6.4 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x7.3 = mean(selected_columns_2021$x1.6,na.rm=T)
+
+yhat_x1.6 = predict(logreg,new=data.frame(x1.6=dummy_x1.6, x3.2 = rep(average_x3.2, length(dummy_x1.6)), x5.1 = rep(average_x5.1, length(dummy_x1.6)), x6.4 = rep(average_x6.4, length(dummy_x1.6)), x7.3 = rep(average_x7.3, length(dummy_x1.6)), region = rep("Sub-Saharan Africa", length(dummy_x1.6))))
+yhat_x3.2 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x3.2)), x3.2 = dummy_x3.2, x5.1 = rep(average_x5.1, length(dummy_x3.2)), x6.4 = rep(average_x6.4, length(dummy_x3.2)), x7.3 = rep(average_x7.3, length(dummy_x3.2)),region = rep("Sub-Saharan Africa", length(dummy_x3.2))))
+yhat_x5.1 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x5.1)), x3.2 = rep(average_x3.2, length(dummy_x5.1)), x5.1 = dummy_x5.1, x6.4 = rep(average_x6.4, length(dummy_x5.1)), x7.3 = rep(average_x7.3, length(dummy_x5.1)), region = rep("Sub-Saharan Africa", length(dummy_x5.1))))
+yhat_x6.4 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x6.4)), x3.2 = rep(average_x3.2, length(dummy_x6.4)), x5.1 = rep(average_x5.1, length(dummy_x6.4)), x6.4 = dummy_x6.4, x7.3 = rep(average_x7.3, length(dummy_x6.4)), region = rep("Sub-Saharan Africa", length(dummy_x6.4))))
+yhat_x7.3 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x7.3)), x3.2 = rep(average_x3.2, length(dummy_x7.3)), x5.1 = rep(average_x5.1, length(dummy_x7.3)), x6.4 = rep(average_x6.4, length(dummy_x7.3)), x7.3 = dummy_x7.3, region = rep("Sub-Saharan Africa", length(dummy_x7.3))))
+
+phat_x1.6 = exp(yhat_x1.6)/(1+exp(yhat_x1.6))
+phat_x3.2 = exp(yhat_x3.2)/(1+exp(yhat_x3.2))
+phat_x5.1 = exp(yhat_x5.1)/(1+exp(yhat_x5.1))
+phat_x6.4 = exp(yhat_x6.4)/(1+exp(yhat_x6.4))
+phat_x7.3 = exp(yhat_x7.3)/(1+exp(yhat_x7.3))
+
+p1 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x1.6, y=low_HD)) + geom_line(aes(x=dummy_x1.6,y=phat_x1.6), data =as.data.frame(cbind(dummy_x1.6, phat_x1.6)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))
+p2 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x3.2, y=low_HD)) + geom_line(aes(x=dummy_x3.2,y=phat_x3.2), data =as.data.frame(cbind(dummy_x3.2, phat_x3.2)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))
+p3 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x5.1, y=low_HD)) + geom_line(aes(x=dummy_x5.1,y=phat_x5.1), data =as.data.frame(cbind(dummy_x5.1, phat_x5.1)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))
+p4 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x6.4, y=low_HD)) + geom_line(aes(x=dummy_x6.4,y=phat_x6.4), data =as.data.frame(cbind(dummy_x6.4, phat_x6.4)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))
+p5 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x7.3, y=low_HD)) + geom_line(aes(x=dummy_x7.3,y=phat_x7.3), data =as.data.frame(cbind(dummy_x7.3, phat_x7.3)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))
+
+grid.arrange(p1,p2,p3,p4,p5, nrow = 2)
+```
+
+Steep slope, more significant
+
+Thereis equation for shift and slope, that can be meaning
+
+
+
+Try random forest, explain which will trust more. 

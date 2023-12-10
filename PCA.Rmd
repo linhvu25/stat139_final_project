@@ -1,9 +1,9 @@
 ---
 title: "PCA"
 author: 
--"Aissata Bah"
--"Brice Laurent"
--"Linh Vu"
+  -"Aissata Bah"
+  -"Brice Laurent"
+  -"Linh Vu"
 date: "2023-12-09"
 output: pdf_document
 ---

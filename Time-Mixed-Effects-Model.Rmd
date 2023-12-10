@@ -1,5 +1,5 @@
 ---
-title: "TimeMixedEffectsModel"
+title: "Time Mixed Effects Model"
 author: 
   -"Aissata Bah"
   -"Brice Laurent"
@@ -9,17 +9,16 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r}
+```{r,message=F}
 # Load Libraries
 library(dplyr)
 library(ggplot2)
 library(lme4)
 library(broom.mixed)
 library(lmerTest)
-library(ggpubr)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -32,13 +31,10 @@ where $\alpha_{region}\sim N(\mu_{\alpha},\sigma_{\alpha}^2)$ and $\beta_{region
 This equation is assuming no correlation between the random effects. However, from the following plot, we can see that the average HDI of all the regions seem to follow a similar trajectory over time and, therefore, we would expect the random effects to be correlated between regions. Because of this, we will allow for correlation between random effects, for which there is a closed form solution. 
 
 ```{r}
-data[data$year == "2012-2013", "year"] = "2012.5"
-data[data$year == "2017-2018", "year"] = "2017.5"
-data$year = as.numeric(data$year)
 average_hdi = data %>% group_by(region,year) %>% summarise(average_hdi = mean(hdi))
-hdi_region = ggplot(data=average_hdi, aes(x=year, y=average_hdi)) + geom_line(aes(color = region))+  theme(legend.text = element_text(size = 8))
-hdi_country = ggplot(data=data, aes(x=year, y=hdi, group = country, col=region)) + geom_line()+  theme(legend.text = element_text(size = 8))
-ggarrange(hdi_region, hdi_country, ncol=2, common.legend = TRUE, legend="bottom")
+average_hdi[average_hdi$year == "2012-2013", "year"] = "2012.5"
+average_hdi[average_hdi$year == "2017-2018", "year"] = "2017.5"
+ggplot(data=average_hdi, aes(x=as.numeric(year), y=average_hdi)) + geom_line(aes(color = region))
 ```
 
 
