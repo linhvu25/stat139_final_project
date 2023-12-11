@@ -1,9 +1,9 @@
 ---
 title: "Logistic Regression"
 author: 
-  -"Aissata Bah"
-  -"Brice Laurent"
-  -"Linh Vu"
+  - "Aissata Bah"
+  - "Brice Laurent"
+  - "Linh Vu"
 date: "2023-12-10"
 output: pdf_document
 ---

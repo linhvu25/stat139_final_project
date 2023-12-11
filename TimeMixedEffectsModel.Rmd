@@ -1,9 +1,9 @@
 ---
-title: "TimeMixedEffectsModel"
+title: "Time Mixed Effects Model"
 author: 
-  -"Aissata Bah"
-  -"Brice Laurent"
-  -"Linh Vu"
+  - "Aissata Bah"
+  - "Brice Laurent"
+  - "Linh Vu"
 date: "2023-12-07"
 output: pdf_document
 ---
@@ -20,6 +20,7 @@ library(lme4)
 library(broom.mixed)
 library(lmerTest)
 library(ggpubr)
+library(knitr)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -64,17 +65,17 @@ fixed_effects = as.data.frame(summary(time_mixed_effects)$coefficients)
 adjusted_p_values = p.adjust(fixed_effects[, "Pr(>|t|)"], method = "bonferroni")
 
 fixed_effects$`Bonferroni_Pr(>|t|)` = adjusted_p_values
-fixed_effects
+kable(fixed_effects)
 ```
 Although overly conservative, We have included Bonferroni adjused p-values, since multiple hypothesis tests were performed. The only fixed variable that was significant (both unadjusted and adjusted) in this model was the `years_from_2000` variable. The other variables were very far from significance. 
 
 ```{r}
 # Importance of Considering Region
-time_mixed_effects_noRegion = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000||country),data=selected_columns)
+time_mixed_effects_noRegion = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000||country),data=selected_columns)
 anova(time_mixed_effects,time_mixed_effects_noRegion)
 
-# Importance of Considering Year
-time_mixed_effects_noYear = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region),data=selected_columns)
+# Importance of Considering Year as a random effect by country
+time_mixed_effects_noYear = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1|country),data=selected_columns)
 anova(time_mixed_effects,time_mixed_effects_noYear)
 ```
 

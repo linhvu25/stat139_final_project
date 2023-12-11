@@ -1,9 +1,9 @@
 ---
 title: "Stat139_Final_Project"
 author: 
-  -"Brice Laurent"
-  -"Linh Vu"
-  -"Aissata Bah"
+  - "Brice Laurent"
+  - "Linh Vu"
+  - "Aissata Bah"
 date: "2023-11-30"
 output: pdf_document
 ---
