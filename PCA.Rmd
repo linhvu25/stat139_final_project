@@ -20,6 +20,7 @@ library(lme4)
 library(broom.mixed)
 library(lmerTest)
 library(tibble)
+library(ggpubr)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -43,8 +44,15 @@ variance_explained = (pca$sdev^2) / sum(pca$sdev^2)
 
 ```{r}
 # Visualize Principle Components
-PC1and2 = as.data.frame(cbind(pca$x[,c(1,2)], data$country))
-ggplot(data = PC1and2,aes(x=as.numeric(PC1), y=as.numeric(PC2))) + geom_point(aes(color = data$country)) + theme(legend.position = "none")
+PC1and2 = as.data.frame(cbind(pca$x[,c(1,2)], data[, c("country", "year", "hdi")]))
+PC1and2$PC1 = as.numeric(PC1and2$PC1)
+PC1and2$PC2 = as.numeric(PC1and2$PC2)
+PC1and2$Country = PC1and2$country
+p1 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = Country)) + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3))
+p2 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = hdi))
+
+p1
+p2
 ```
 
 ```{r}

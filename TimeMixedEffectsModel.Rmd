@@ -29,7 +29,11 @@ data = read.csv("./data/data_clean.csv")
 
 To include the data points from all the years collected in both datasets, we decided to incorporate time effects into a mixed effects model. For this model, we  used the variables manually selected based on correlations: `x1.6`, `x3.2`, `x5.1`, `x6.4`, and `x7.3`. This mixed effects model is based on the equation:
 $$HDI_{time,~country,~region} = \alpha_{region}+\beta_{region}\times X_{time,~country,~region}+a_{country}+b\times X_{time,~country}+\varepsilon_{time,~country,~region}$$
-where $\alpha_{region}\sim N(\mu_{\alpha},\sigma_{\alpha}^2)$, $\beta_{region}\sim N(\mu_{\beta},\sigma_{\beta}^2)$, $a_{country}\sim N(\mu_{a},\sigma_{a}^2)$, $b_{country}\sim N(\mu_{b},\sigma_{b}^2)$, and $\varepsilon_{time,~country,~region}\sim N(0,\sigma_{HDI}^2)$.
+where 
+$$\alpha_{region}\sim N(\mu_{\alpha},\sigma_{\alpha}^2)$$
+$$\beta_{region}\sim N(\mu_{\beta},\sigma_{\beta}^2)$$ $$a_{country}\sim N(\mu_{a},\sigma_{a}^2)$$
+$$b_{country}\sim N(\mu_{b},\sigma_{b}^2)$$
+$$\varepsilon_{time,~country,~region}\sim N(0,\sigma_{HDI}^2)$$
 
 $X_{time,~country,~region}$ is the design matrix for the variables `x1.6`, `x3.2`, `x5.1`, `x6.4`, `x7.3`, and intercept, while $X_{time,~country}$ is the design matrix for the time variable (in years) and intercept. 
 
@@ -39,9 +43,10 @@ This equation above assumes independence between random effects. Though this ass
 data[data$year == "2012-2013", "year"] = "2012.5"
 data[data$year == "2017-2018", "year"] = "2017.5"
 data$year = as.numeric(data$year)
-average_hdi = data %>% group_by(region,year) %>% summarise(average_hdi = mean(hdi))
-hdi_region = ggplot(data=average_hdi, aes(x=year, y=average_hdi)) + geom_line(aes(color = region))+  theme(legend.text = element_text(size = 8))
-hdi_country = ggplot(data=data, aes(x=year, y=hdi, group = country, col=region)) + geom_line()+  theme(legend.text = element_text(size = 8))
+data$Region = data$region
+average_hdi = data %>% group_by(Region,year) %>% summarise(average_hdi = mean(hdi))
+hdi_region = ggplot(data=average_hdi, aes(x=year, y=average_hdi)) + geom_line(aes(color = Region))+  theme(legend.text = element_text(size = 8)) + labs(title = "Average HDI versus Time, by Region", x= "Time (Years)", y = "Average HDI")
+hdi_country = ggplot(data=data, aes(x=year, y=hdi, group = country, col=Region)) + geom_line()+  theme(legend.text = element_text(size = 8)) + labs(title = "HDI versus Time, by Country", x= "Time (Years)", y = "HDI")
 ggarrange(hdi_region, hdi_country, ncol=2, common.legend = TRUE, legend="bottom")
 ```
 
@@ -62,21 +67,29 @@ The coefficients from the fixed effects are as follows:
 ```{r}
 # Determine Significance of Coefficients
 fixed_effects = as.data.frame(summary(time_mixed_effects)$coefficients)
-adjusted_p_values = p.adjust(fixed_effects[, "Pr(>|t|)"], method = "bonferroni")
-
-fixed_effects$`Bonferroni_Pr(>|t|)` = adjusted_p_values
 kable(fixed_effects)
 ```
-Although overly conservative, We have included Bonferroni adjused p-values, since multiple hypothesis tests were performed. The only fixed variable that was significant (both unadjusted and adjusted) in this model was the `years_from_2000` variable. The other variables were very far from significance. 
+The only fixed variable that was significant (both unadjusted and adjusted) in this model was the `years_from_2000` variable. The other variables were very far from significance. 
 
 ```{r}
-# Importance of Considering Region
-time_mixed_effects_noRegion = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+years_from_2000||country),data=selected_columns)
+# Importance of fixed effects
+time_mixed_effects_noFixed = lmer(hdi~years_from_2000+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noFixed)
+
+
+
+# Importance of Considering variables as a random effect of region
+time_mixed_effects_noRegion = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
 anova(time_mixed_effects,time_mixed_effects_noRegion)
 
 # Importance of Considering Year as a random effect by country
 time_mixed_effects_noYear = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1|country),data=selected_columns)
 anova(time_mixed_effects,time_mixed_effects_noYear)
+
+# Importance of including the Rule of Law Variables
+time_mixed_effects_noROL = lmer(hdi~years_from_2000+(1|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
+time_mixed_effects_naomit = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
+anova(time_mixed_effects_naomit,time_mixed_effects_noROL)
 ```
 
 We also analyzed the importance of including random effects of the variables `x1.6`, `x3.2`, `x5.1`, `x6.4`, and `x7.3` based on region, and the random effects of the time variable based on country using an extra-sum-of-squared F test. These F-tests
@@ -89,11 +102,12 @@ country_coef = merge(country_coef, selected_columns[,c("country", "region")], by
 ggplot(data = country_coef, aes(x=`(Intercept)`, y = years_from_2000)) + geom_point(aes(color=region))
 
 residuals = augment(time_mixed_effects)
+residuals$Region = residuals$region
 ggplot(data = residuals, aes(x=.fitted, y = .resid)) +
-  geom_point(aes(color = region)) +
+  geom_point(aes(color = Region)) +
   theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
   geom_hline(yintercept = 0) +
-  labs(y="Residuals", x="FItted HDI")
+  labs(y="Residuals", x="Fitted HDI")
 ```
 
 
