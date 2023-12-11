@@ -24,12 +24,15 @@ library(ggpubr)
 data = read.csv("./data/data_clean.csv")
 ```
 
-# Theory Behind Using Linear Mixed Effects Model for Time
+# Mixed Effects Linear Model for Time
 
-$$HDI_{year,region} = \alpha_{region}+\beta_{region}X_{year,country,region}+\varepsilon_{country,region}$$
-where $\alpha_{region}\sim N(\mu_{\alpha},\sigma_{\alpha}^2)$ and $\beta_{region}\sim N(\mu_{\beta},\sigma_{\beta}^2)$
+To include the data points from all the years collected in both datasets, we decided to incorporate time effects into a mixed effects model. For this model, we  used the variables manually selected based on correlations: `x1.6`, `x3.2`, `x5.1`, `x6.4`, and `x7.3`. This mixed effects model is based on the equation:
+$$HDI_{time,~country,~region} = \alpha_{region}+\beta_{region}\times X_{time,~country,~region}+a_{country}+b\times X_{time,~country}+\varepsilon_{time,~country,~region}$$
+where $\alpha_{region}\sim N(\mu_{\alpha},\sigma_{\alpha}^2)$, $\beta_{region}\sim N(\mu_{\beta},\sigma_{\beta}^2)$, $a_{country}\sim N(\mu_{a},\sigma_{a}^2)$, $b_{country}\sim N(\mu_{b},\sigma_{b}^2)$, and $\varepsilon_{time,~country,~region}\sim N(0,\sigma_{HDI}^2)$.
 
-This equation is assuming no correlation between the random effects. However, from the following plot, we can see that the average HDI of all the regions seem to follow a similar trajectory over time and, therefore, we would expect the random effects to be correlated between regions. Because of this, we will allow for correlation between random effects, for which there is a closed form solution. 
+$X_{time,~country,~region}$ is the design matrix for the variables `x1.6`, `x3.2`, `x5.1`, `x6.4`, `x7.3`, and intercept, while $X_{time,~country}$ is the design matrix for the time variable (in years) and intercept. 
+
+This equation above assumes independence between random effects. Though this assumption is reasonable for the random effects of Rule of Law variables between regions, it is not as reasonable for the random effects of the time variable between countries. This can be seen from the chart below since the HDI of different countries mostly follow similar trajectories over times, and therefore are associated. There is no closed form solution when we allow correlation between random effects, so the actual mixed effects model will not exactly follow the equation above.
 
 ```{r}
 data[data$year == "2012-2013", "year"] = "2012.5"
@@ -50,17 +53,20 @@ selected_columns[selected_columns$year == "2017-2018", "year"] = "2017.5"
 selected_columns$year = as.numeric(selected_columns$year)
 selected_columns$years_from_2000 = selected_columns$year - 2000
 
-time_mixed_effects = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
+time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
 ```
+
+The coefficients from the fixed effects are as follows:
 
 ```{r}
 # Determine Significance of Coefficients
-fixed_effects = summary(time_mixed_effects)$coefficients
+fixed_effects = as.data.frame(summary(time_mixed_effects)$coefficients)
+adjusted_p_values = p.adjust(fixed_effects[, "Pr(>|t|)"], method = "bonferroni")
+
+fixed_effects$`Bonferroni_Pr(>|t|)` = adjusted_p_values
 fixed_effects
 ```
-Degrees of Freedom=Total number of observations−Number of fixed effects−Number of estimated variance components
-
-Bonferroni Correction: $\alpha$=0.05/6=0.00833
+Although overly conservative, We have included Bonferroni adjused p-values, since multiple hypothesis tests were performed. The only fixed variable that was significant (both unadjusted and adjusted) in this model was the `years_from_2000` variable. The other variables were very far from significance. 
 
 ```{r}
 # Importance of Considering Region
@@ -71,6 +77,8 @@ anova(time_mixed_effects,time_mixed_effects_noRegion)
 time_mixed_effects_noYear = lmer(hdi~x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region),data=selected_columns)
 anova(time_mixed_effects,time_mixed_effects_noYear)
 ```
+
+We also analyzed the importance of including random effects of the variables `x1.6`, `x3.2`, `x5.1`, `x6.4`, and `x7.3` based on region, and the random effects of the time variable based on country using an extra-sum-of-squared F test. These F-tests
 
 ```{r}
 # Make Plots
