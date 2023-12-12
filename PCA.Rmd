@@ -21,6 +21,7 @@ library(broom.mixed)
 library(lmerTest)
 library(tibble)
 library(ggpubr)
+library(knitr)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -48,12 +49,14 @@ PC1and2 = as.data.frame(cbind(pca$x[,c(1,2)], data[, c("country", "year", "hdi")
 PC1and2$PC1 = as.numeric(PC1and2$PC1)
 PC1and2$PC2 = as.numeric(PC1and2$PC2)
 PC1and2$Country = PC1and2$country
-p1 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = Country)) + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3))
-p2 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = hdi))
+p1 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = Country)) + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3)) + labs(title="PC2 versus PC1, by Country")
+p2 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = hdi)) + labs(title="PC2 versus PC1, by HDI")
 
 p1
 p2
 ```
+
+\newpage
 
 ```{r}
 # Fit mixed linear model with top 5 principal components
@@ -64,36 +67,50 @@ selected_columns_data$year = as.numeric(selected_columns_data$year)
 selected_columns_data$years_from_2000 = selected_columns_data$year - 2000
 TopPCs = as.data.frame(cbind(pca$x[,seq(1,5)], selected_columns_data))
                   
-mixed_effects = lmer(hdi~PC1+PC2+PC3+PC4+PC5+(1+PC1+PC2+PC3+PC4+PC5|region)+(1+years_from_2000||country),data=TopPCs)
+lm = lm(hdi~years_from_2000+PC1+PC2+PC3+PC4+PC5+region,data=TopPCs)
 
-summary(mixed_effects)
+kable(summary(lm)$coefficients)
+```
+
+```{r}
+# Find significance of including region variable
+lm_noRegion = lm(hdi~years_from_2000+PC1+PC2+PC3+PC4+PC5,data=TopPCs)
+
+anova(lm, lm_noRegion)
+
 ```
 
 ```{r}
 # Determine importance of each variable
-TopPCs_loadings_squared <- pca$rotation[,seq(1,5)]^2
-TopPCs_loadings_squared_long <- as.data.frame(as.table(TopPCs_loadings_squared))
-colnames(TopPCs_loadings_squared_long) <- c("Variable", "Principal_Component", "Loading")
-ggplot(TopPCs_loadings_squared_long, aes(x = Principal_Component, y = Loading)) +
+TopPCs_loadings_abs <- abs(pca$rotation[,seq(1,5)])
+TopPCs_loadings_abs_long <- as.data.frame(as.table(TopPCs_loadings_abs))
+colnames(TopPCs_loadings_abs_long) <- c("Variable", "Principal_Component", "Loading")
+ggplot(TopPCs_loadings_abs_long, aes(x = Principal_Component, y = Loading)) +
   geom_boxplot(outlier.size = 0) +
   geom_jitter(aes(color = Variable)) +
-  labs(title = "Boxplot of Loadings by Principal Component",
+  labs(title = "Boxplot of Component Coefficients by Principal Component",
        x = "Principal Component",
-       y = "Loading")
+       y = "Absolute Value of Component Coefficient")
 
-rowSums(TopPCs_loadings_squared)[order(-rowSums(TopPCs_loadings_squared))]
+rowSums(TopPCs_loadings_abs)[order(-rowSums(TopPCs_loadings_abs))]
 
-TopPCs_loadings_squared_grouped = as.data.frame(TopPCs_loadings_squared) 
-TopPCs_loadings_squared_grouped$Row_Labels = row.names(TopPCs_loadings_squared)
-TopPCs_loadings_squared_grouped = TopPCs_loadings_squared_grouped %>%
-  mutate(First_Digit = as.numeric(gsub("\\D*(\\d).*", "\\1", TopPCs_loadings_squared_grouped$Row_Labels))) %>%
+TopPCs_loadings_abs_grouped = as.data.frame(TopPCs_loadings_abs) 
+TopPCs_loadings_abs_grouped$Row_Labels = row.names(TopPCs_loadings_abs)
+TopPCs_loadings_abs_grouped = TopPCs_loadings_abs_grouped %>%
+  mutate(First_Digit = as.numeric(gsub("\\D*(\\d).*", "\\1", TopPCs_loadings_abs_grouped$Row_Labels))) %>%
   select(-Row_Labels)
-TopPCs_loadings_squared_grouped = TopPCs_loadings_squared_grouped %>%
+TopPCs_loadings_abs_grouped = TopPCs_loadings_abs_grouped %>%
   group_by(First_Digit) %>%
   summarise(across(everything(), sum, na.rm = TRUE)) %>%
   column_to_rownames(var = "First_Digit")
 
-rowSums(TopPCs_loadings_squared_grouped)[order(-rowSums(TopPCs_loadings_squared_grouped))]
+TopPCs_loadings_abs_grouped = as.data.frame(t(TopPCs_loadings_abs_grouped)) %>% rename("1 (Constraints on Government Powers)" = "1", "2 (Absence of Corruption)" = "2", "3 (Open Government )" = "3", "4 (Fundamental Rights)" = "4", "5 (Order and Security)" = "5", "6(Regulatory Enforcement)" = "6", "7 (Civil Justice)" = "7", "8 (Criminal Justice)" = "8")
+
+df = as.data.frame(colSums(TopPCs_loadings_abs_grouped)[order(-colSums(TopPCs_loadings_abs_grouped))])
+
+names(df) = "Sum of Absolute Values of Component Coefficients"
+
+kable(df)
 ```
 
 The squared loadings represent the proportion of the variance of the variable that is accounted for by the corresponding principal component.

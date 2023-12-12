@@ -4,6 +4,7 @@ author:
   - "Aissata Bah"
   - "Brice Laurent"
   - "Linh Vu"
+geometry: margin=1cm
 date: "2023-12-07"
 output: pdf_document
 ---
@@ -21,6 +22,7 @@ library(broom.mixed)
 library(lmerTest)
 library(ggpubr)
 library(knitr)
+library(kableExtra)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -59,7 +61,16 @@ selected_columns[selected_columns$year == "2017-2018", "year"] = "2017.5"
 selected_columns$year = as.numeric(selected_columns$year)
 selected_columns$years_from_2000 = selected_columns$year - 2000
 
-time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
+selected_columns = na.omit(selected_columns)
+
+time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region+(1+years_from_2000|country),data=selected_columns)
+
+plotFit <- function(TimeCourse, ...)
+ggplot(selected_columns, aes(x = year, y = hdi, col=factor(country))) +
+  geom_point(alpha = 0.5) + facet_wrap(~region,  nrow = 2) + 
+       geom_line(data = cbind(selected_columns, y.hat = predict(time_mixed_effects)), aes(x = year, y = y.hat), ...) + labs(x = "Year", y = "HDI", color = "Country") + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3))
+
+plotFit(time_mixed_effects)
 ```
 
 The coefficients from the fixed effects are as follows:
@@ -67,29 +78,23 @@ The coefficients from the fixed effects are as follows:
 ```{r}
 # Determine Significance of Coefficients
 fixed_effects = as.data.frame(summary(time_mixed_effects)$coefficients)
-kable(fixed_effects)
+
+kable(fixed_effects,  format = "pipe", align = c("l", "c", "c", "c", "c", "c"))%>% kable_styling(full_width = FALSE)
 ```
 The only fixed variable that was significant (both unadjusted and adjusted) in this model was the `years_from_2000` variable. The other variables were very far from significance. 
 
 ```{r}
-# Importance of fixed effects
-time_mixed_effects_noFixed = lmer(hdi~years_from_2000+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=selected_columns)
-anova(time_mixed_effects,time_mixed_effects_noFixed)
+# Importance of insig fixed effects
+time_mixed_effects_noinsig = lmer(hdi~years_from_2000+x7.3+region+(1|country),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noinsig)
 
-
-
-# Importance of Considering variables as a random effect of region
-time_mixed_effects_noRegion = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
-anova(time_mixed_effects,time_mixed_effects_noRegion)
-
-# Importance of Considering Year as a random effect by country
-time_mixed_effects_noYear = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1|country),data=selected_columns)
+# Importance of random effects of years
+time_mixed_effects_noYear = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region+(1|country),data=selected_columns)
 anova(time_mixed_effects,time_mixed_effects_noYear)
 
-# Importance of including the Rule of Law Variables
-time_mixed_effects_noROL = lmer(hdi~years_from_2000+(1|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
-time_mixed_effects_naomit = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+(1+x1.6+x3.2+x5.1+x6.4+x7.3|region)+(1+years_from_2000||country),data=na.omit(selected_columns))
-anova(time_mixed_effects_naomit,time_mixed_effects_noROL)
+# Importance of Mixed Effects model
+time_mixed_effects_noMixed = lm(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region,data=selected_columns)
+anova(time_mixed_effects_noYear,time_mixed_effects_noMixed)
 ```
 
 We also analyzed the importance of including random effects of the variables `x1.6`, `x3.2`, `x5.1`, `x6.4`, and `x7.3` based on region, and the random effects of the time variable based on country using an extra-sum-of-squared F test. These F-tests
