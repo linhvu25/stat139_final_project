@@ -1,0 +1,173 @@
+---
+title: "Mixed Effects Model"
+author: "Group"
+date: "2023-12-01"
+output: pdf_document
+---
+
+```{r data and libraries}
+library(glmnet)
+library(knitr)
+# library(lme4)
+# library(glmmLasso)
+# library(MuMIn)
+library(dplyr)
+
+# load data
+data_clean <- read.csv("data/data_clean.csv")
+
+# get relevant columns: HDI + ROLI overall factors and specific subfactors
+cols <- c("hdi", "year", "country", "region", colnames(data_clean)[39:90])
+
+# extract those columns -- not subsetting by year here
+# remove summary factors
+data <- data_clean[,cols] %>%
+  select(-contains("factor"))
+
+# remove any rows with NA --> all data
+df <- data[complete.cases(data), ]
+
+# data in most recent year - 2021
+df1 <- df[df$year==2021,]
+df1 <- subset(df1, select=-c(year))
+```
+
+Methods: 
+- run using data in a singular year (choose 2021 because most recent year and largest sample size)
+- choose obs from multiple years --> data on all countries available. we have 138 unique countries in dataset, all of them are in 2021 data --> this method is the same as the 1st method. 
+- using the entire entire dataset
+
+# 2021 data
+
+```{r model selection 2021}
+# model with all variables
+model1 <- lm(hdi~.-country, df1)
+
+# backward selection
+model2 <- step(model1, direction="backward", trace=0)
+
+# intercept model
+interceptModel <- lm(hdi~1, df1)
+
+# interaction
+interactionModel <- lm(hdi~.+region*., df1)
+
+# forward selection
+model3 <- step(interceptModel, scope = list(upper = formula(model1)),
+               direction = "forward", trace=0)
+
+# stepwise selection
+model4 <- step(model2, scope = list(lower = formula(interceptModel),
+                                    upper = formula(model1)),
+               direction = "both", trace=0)
+
+# # save models
+# saveRDS(model1, file = "pred_models/model1.rds")
+# saveRDS(model2, file = "pred_models/model2.rds")
+# saveRDS(model3, file = "pred_models/model3.rds")
+# saveRDS(model4, file = "pred_models/model4.rds")
+
+# # load models
+# model1 <- readRDS("pred_models/model1.rds")
+# model2 <- readRDS("pred_models/model2.rds")
+# model3 <- readRDS("pred_models/model3.rds")
+# model4 <- readRDS("pred_models/model4.rds")
+
+summary(model2)$coefficients
+
+# make tables
+summary2021 <- data.frame("AIC" = c(AIC(model1),  
+                                    AIC(model2), AIC(model3), AIC(model4)),
+                          
+                          "BIC" = c(BIC(model1),
+                                    BIC(model2), BIC(model3), BIC(model4)),
+                          
+           "r.squared" = c(summary(model1)$r.squared,
+                           summary(model2)$r.squared, 
+                          summary(model3)$r.squared, summary(model4)$r.squared))
+rownames(summary2021) <- c("all var", "backward selection", "forward selection", "stepwise")
+
+# print table
+kable(summary2021)
+```
+
+
+```{r ridge and lasso using cv.glmnet}
+# get predictors
+X = model.matrix(model2)[,-1]
+
+# fit
+ridge <- cv.glmnet(X, df1$hdi, alpha=0) 
+lasso <- cv.glmnet(X, df1$hdi, alpha=1)
+
+ridge
+lasso
+
+# plot
+plot(ridge)
+plot(lasso)
+
+# best lambda
+ridge$lambda.min
+lasso$lambda.min
+
+# get mse values
+min(ridge$cvm)
+min(lasso$cvm)
+
+# beta trajectories
+matplot(log(ridge$glmnet.fit$lambda,10), 
+        t(ridge$glmnet.fit$beta),
+        type="l",col="gray33",lwd=1, 
+        xlab=expression(log_10(lambda)), 
+        ylab=expression(hat(beta)),
+        main="beta estimates trajectory, ridge")
+abline(h=0)
+
+matplot(log(lasso$glmnet.fit$lambda,10), 
+        t(lasso$glmnet.fit$beta),
+        type="l",col="gray33",lwd=1, 
+        xlab=expression(log_10(lambda)), 
+        ylab=expression(hat(beta)),
+        main="beta estimates trajectory, lasso")
+abline(h=0)
+
+best_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=lasso$lambda.min)
+coef(best_lasso)
+
+remaining_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=0.05011872)
+coef(remaining_lasso)
+
+best_ridge <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=ridge$lambda.min)
+coef(best_ridge)
+```
+
+```{r lasso using BIC}
+lambda_values <- seq(from = 1e-04, to = 10^4, length.out = 5000)
+bic_values <- numeric(length(lambda_values))
+X <- model.matrix(model2)[,-1]
+Y <- df1$hdi
+
+for (i in seq_along(lambda_values)) {
+  # Using glmnet for Lasso Regression
+  lasso_model <- glmnet(X, df1$hdi, alpha = 1, lambda = lambda_values[i])
+  
+  # Calculate BIC
+  rss <- sum((predict(lasso_model, newx = X, s = "lambda.min") - Y)^2)
+  n <- length(Y)
+  k <- sum(coef(lasso_model, s = "lambda.min") != 0)
+  bic_values[i] <- n * log(rss / n) + k * log(n)
+}
+
+# Find the index of the minimum BIC value
+best_lambda_index <- which.min(bic_values)
+best_lambda <- lambda_values[best_lambda_index]
+
+# Fit the final Lasso Regression model using the selected lambda
+final_lasso_model <- glmnet(X, Y, alpha = 1, lambda = best_lambda)
+
+# Display results
+best_lambda
+coef(final_lasso_model, s = "lambda.min")
+```
+
