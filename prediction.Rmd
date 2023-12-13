@@ -26,6 +26,8 @@ data <- data_clean[,cols] %>%
 
 # remove any rows with NA --> all data
 df <- data[complete.cases(data), ]
+df = df %>%
+  rename(x8.7=x8.7..due.process.of.the.law.and.rights.of.the.accused)
 
 # data in most recent year - 2021
 df1 <- df[df$year==2021,]
@@ -73,8 +75,6 @@ model4 <- step(model2, scope = list(lower = formula(interceptModel),
 # model3 <- readRDS("pred_models/model3.rds")
 # model4 <- readRDS("pred_models/model4.rds")
 
-summary(model2)$coefficients
-
 # make tables
 summary2021 <- data.frame("AIC" = c(AIC(model1),  
                                     AIC(model2), AIC(model3), AIC(model4)),
@@ -88,11 +88,15 @@ summary2021 <- data.frame("AIC" = c(AIC(model1),
 rownames(summary2021) <- c("all var", "backward selection", "forward selection", "stepwise")
 
 # print table
-kable(summary2021)
+summary2021
+```
+\newpage
+```{r, echo = F}
+kable(summary(model2)$coefficients)
 ```
 
-
-```{r ridge and lasso using cv.glmnet}
+\newpage
+```{r ridge and lasso using cv.glmnet, echo = F}
 # get predictors
 X = model.matrix(model2)[,-1]
 
@@ -131,18 +135,34 @@ matplot(log(lasso$glmnet.fit$lambda,10),
         ylab=expression(hat(beta)),
         main="beta estimates trajectory, lasso")
 abline(h=0)
-
-best_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=lasso$lambda.min)
-coef(best_lasso)
-
-remaining_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=0.05011872)
-coef(remaining_lasso)
-
-best_ridge <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=ridge$lambda.min)
-coef(best_ridge)
 ```
 
-```{r lasso using BIC}
+\newpage
+```{r, echo = F}
+best_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=lasso$lambda.min)
+best_lamda_df = as.data.frame(coef(best_lasso)[,1])
+names(best_lamda_df) = "Coefficients"
+kable(best_lamda_df)
+```
+
+\newpage
+```{r, echo = F}
+remaining_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=0.05011872)
+remaining_lasso_df = as.data.frame(coef(remaining_lasso)[,1])
+names(remaining_lasso_df) = "Coefficients"
+kable(remaining_lasso_df)
+```
+
+\newpage
+```{r,, echo = F}
+best_ridge <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=ridge$lambda.min)
+best_ridge_df = as.data.frame(coef(best_ridge)[,1])
+names(best_ridge_df) = "Coefficients"
+kable(best_ridge_df)
+```
+
+\newpage
+```{r lasso using BIC, echo = F}
 lambda_values <- seq(from = 1e-04, to = 10^4, length.out = 5000)
 bic_values <- numeric(length(lambda_values))
 X <- model.matrix(model2)[,-1]
@@ -168,6 +188,8 @@ final_lasso_model <- glmnet(X, Y, alpha = 1, lambda = best_lambda)
 
 # Display results
 best_lambda
-coef(final_lasso_model, s = "lambda.min")
+best_lamda_df = as.data.frame(coef(final_lasso_model, s = "lambda.min")[,1])
+names(best_lamda_df) = "Coefficients"
+kable(best_lamda_df)
 ```
 
