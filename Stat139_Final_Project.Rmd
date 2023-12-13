@@ -18,6 +18,17 @@ library(reshape2)
 library(dplyr)
 library(ggplot2)
 library(vtree)
+library(lme4)
+library(broom.mixed)
+library(lmerTest)
+library(ggpubr)
+library(knitr)
+library(kableExtra)
+library(car)
+library(glmnet)
+library(lmtest)
+library(sandwich)
+
 
 # Load Data
 HDR = read.csv("./data/HDR.csv")
@@ -141,3 +152,545 @@ ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) +
   ggtitle("Correlation Heatmap, all Variables")
 ```
 
+```{r}
+# load data
+data_clean <- read.csv("data_clean.csv")
+
+# subset to 2021 data only
+data_clean_2021 = data_clean[data_clean$year == 2021,]
+df = data_clean_2021
+```
+
+
+```{r corr}
+# determine 1 representative variable from each of the 8 categories
+
+# which(colnames(df) == "x1.1")
+# which(colnames(df) == "x1.6")
+f1 = cor(df[,39:44], use="na.or.complete")
+f1
+(colSums(f1) - 1)/(ncol(f1) - 1)
+
+# which(colnames(df) == "x2.1")
+# which(colnames(df) == "x2.4")
+f2 = cor(df[,46:49], use="na.or.complete")
+f2
+(colSums(f2) - 1)/(ncol(f2) - 1)
+
+# which(colnames(df) == "x3.1")
+# which(colnames(df) == "x3.4")
+f3 = cor(df[,51:54], use="na.or.complete")
+f3
+(colSums(f3) - 1)/(ncol(f3) - 1)
+
+# which(colnames(df) == "x4.1")
+# which(colnames(df) == "x4.8")
+f4 = cor(df[,56:63], use="na.or.complete")
+f4
+(colSums(f4) - 1)/(ncol(f4) - 1)
+
+# which(colnames(df) == "x5.1")
+# which(colnames(df) == "x5.3")
+f5 = cor(df[,65:67], use="na.or.complete")
+f5
+(colSums(f5) - 1)/(ncol(f5) - 1)
+
+# which(colnames(df) == "x6.1")
+# which(colnames(df) == "x6.5")
+f6 = cor(df[,69:73], use="na.or.complete")
+f6
+(colSums(f6) - 1)/(ncol(f6) - 1)
+
+# less correlation
+# which(colnames(df) == "x7.1")
+# which(colnames(df) == "x7.7")
+f7 = cor(df[,75:81], use="na.or.complete")
+f7
+(colSums(f7) - 1)/(ncol(f7) - 1)
+
+# which(colnames(df) == "x8.1")
+# which(colnames(df) == "x8.6")
+f8 = cor(df[,83:88], use="na.or.complete")
+f8
+(colSums(f8) - 1)/(ncol(f8) - 1)
+
+#subset data and compute correlation on subset
+cor(df[, c("x1.6", "x2.1", "x3.2", "x4.2", "x5.1", "x6.4", "x7.3", "x8.5")], use="na.or.complete")
+
+#correlation with 2.1 removed
+f.decide = cor(df[, c("x1.6", "x3.2", "x4.2", "x5.1", "x6.4", "x7.3", "x8.5")], use="na.or.complete")
+(colSums(f.decide) - 1)/(ncol(f.decide) - 1)
+```
+
+```{r models using selected vars}
+#subsetting df with selected variables
+sub_df <- df[, c("country", "hdi", "Region", "x1.6", "x3.2", "x5.1", "x6.4","x7.3")]
+
+#modelling distributions
+f = ggplot(aes(hdi), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of HDI")
+
+a = ggplot(aes(x1.6), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 1.6")
+
+b = ggplot(aes(x3.2), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 3.2")
+
+c = ggplot(aes(x5.1), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 5.1")
+
+d = ggplot(aes(x6.4), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 6.4")
+
+e = ggplot(aes(x7.3), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 7.3")
+
+ggarrange(f,a,b,c,d,e, ncol = 3, nrow = 3)
+
+#fit models
+sub_df$Region = factor(sub_df$Region, levels = c("EU + EFTA + North America", "East Asia & Pacific", "Eastern Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "South Asia", "Sub-Saharan Africa")) #releveling region
+summary(mod1 <- lm(hdi~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+plot(mod1, c(1:3))
+summary(mod4 <- lm(hdi^2~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+plot(mod4, c(1:3))
+
+#calculate robust standard errors for model coefficients
+summary(mod4 <- lm(hdi^2~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+robus = vcovHC(mod4, type = "HC")
+sqrt(diag(robus))
+coeftest(mod4, vcov = vcovHC(mod4, type = "HC"))
+```
+
+```{r pretty table}
+summ = summary(mod1 <- lm(hdi~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+kable(summ$coefficients)
+```
+
+```{r}
+data = read.csv("./data/data_clean.csv")
+selected_columns = data[, c("country","year", "region", "hdi", "x1.6","x3.2", "x5.1", "x6.4", "x7.3")]
+selected_columns_2021 = selected_columns[selected_columns$year == "2021",]
+selected_columns_2021$low_HD = as.numeric(selected_columns_2021$hdi <= 0.550)
+
+# Fit logisitic regression
+logreg = glm(low_HD~x1.6+x3.2+x5.1+x6.4+x7.3+region,data=selected_columns_2021,family="binomial")
+summary(logreg)
+kable(summary(logreg)$coefficients)
+```
+
+```{r}
+# Check significance of region variable
+logreg_noRegion = glm(low_HD~x1.6+x3.2+x5.1+x6.4+x7.3,data=selected_columns_2021,family="binomial")
+anova(logreg_noRegion, logreg, test = "LRT")
+```
+
+```{r}
+# Plot logisitic regression
+dummy_x1.6 = seq(0,max(selected_columns_2021$x1.6,na.rm=T),0.01)
+dummy_x3.2 = seq(0,max(selected_columns_2021$x3.2,na.rm=T),0.01)
+dummy_x5.1 = seq(0,max(selected_columns_2021$x5.1,na.rm=T),0.01)
+dummy_x6.4 = seq(0,max(selected_columns_2021$x6.4,na.rm=T),0.01)
+dummy_x7.3 = seq(0,max(selected_columns_2021$x7.3,na.rm=T),0.01)
+
+average_x1.6 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x3.2 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x5.1 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x6.4 = mean(selected_columns_2021$x1.6,na.rm=T)
+average_x7.3 = mean(selected_columns_2021$x1.6,na.rm=T)
+
+yhat_x1.6 = predict(logreg,new=data.frame(x1.6=dummy_x1.6, x3.2 = rep(average_x3.2, length(dummy_x1.6)), x5.1 = rep(average_x5.1, length(dummy_x1.6)), x6.4 = rep(average_x6.4, length(dummy_x1.6)), x7.3 = rep(average_x7.3, length(dummy_x1.6)), region = rep("Sub-Saharan Africa", length(dummy_x1.6))))
+yhat_x3.2 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x3.2)), x3.2 = dummy_x3.2, x5.1 = rep(average_x5.1, length(dummy_x3.2)), x6.4 = rep(average_x6.4, length(dummy_x3.2)), x7.3 = rep(average_x7.3, length(dummy_x3.2)),region = rep("Sub-Saharan Africa", length(dummy_x3.2))))
+yhat_x5.1 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x5.1)), x3.2 = rep(average_x3.2, length(dummy_x5.1)), x5.1 = dummy_x5.1, x6.4 = rep(average_x6.4, length(dummy_x5.1)), x7.3 = rep(average_x7.3, length(dummy_x5.1)), region = rep("Sub-Saharan Africa", length(dummy_x5.1))))
+yhat_x6.4 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x6.4)), x3.2 = rep(average_x3.2, length(dummy_x6.4)), x5.1 = rep(average_x5.1, length(dummy_x6.4)), x6.4 = dummy_x6.4, x7.3 = rep(average_x7.3, length(dummy_x6.4)), region = rep("Sub-Saharan Africa", length(dummy_x6.4))))
+yhat_x7.3 = predict(logreg,new=data.frame(x1.6=rep(average_x1.6, length(dummy_x7.3)), x3.2 = rep(average_x3.2, length(dummy_x7.3)), x5.1 = rep(average_x5.1, length(dummy_x7.3)), x6.4 = rep(average_x6.4, length(dummy_x7.3)), x7.3 = dummy_x7.3, region = rep("Sub-Saharan Africa", length(dummy_x7.3))))
+
+phat_x1.6 = exp(yhat_x1.6)/(1+exp(yhat_x1.6))
+phat_x3.2 = exp(yhat_x3.2)/(1+exp(yhat_x3.2))
+phat_x5.1 = exp(yhat_x5.1)/(1+exp(yhat_x5.1))
+phat_x6.4 = exp(yhat_x6.4)/(1+exp(yhat_x6.4))
+phat_x7.3 = exp(yhat_x7.3)/(1+exp(yhat_x7.3))
+
+p1 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x1.6, y=low_HD)) + geom_line(aes(x=dummy_x1.6,y=phat_x1.6), color = "#1aa4b8", data =as.data.frame(cbind(dummy_x1.6, phat_x1.6)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True")) + labs(y = "Low HD")
+p2 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x3.2, y=low_HD)) + geom_line(aes(x=dummy_x3.2,y=phat_x3.2), color = "#1a9cb8", data =as.data.frame(cbind(dummy_x3.2, phat_x3.2)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))+ labs(y = "Low HD")
+p3 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x5.1, y=low_HD)) + geom_line(aes(x=dummy_x5.1,y=phat_x5.1), color = "#1a94b8", data =as.data.frame(cbind(dummy_x5.1, phat_x5.1)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))+ labs(y = "Low HD")
+p4 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x6.4, y=low_HD)) + geom_line(aes(x=dummy_x6.4,y=phat_x6.4), color = "#1a8cb8", data =as.data.frame(cbind(dummy_x6.4, phat_x6.4)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))+ labs(y = "Low HD")
+p5 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x7.3, y=low_HD)) + geom_line(aes(x=dummy_x7.3,y=phat_x7.3), color = "#1a84b8", data =as.data.frame(cbind(dummy_x7.3, phat_x7.3)))+ scale_y_continuous(breaks = c(0, 1), labels = c("False", "True"))+ labs( y = "Low HD")
+
+ggarrange(p1,p2,p3,p4,p5, nrow = 2, ncol=3, labels = c("A","B","C","D","E"))
+```
+
+```{r}
+# Logistic Regression Assumptions
+
+# Check for linearity between explanatory variables and residuals, as well as with residuals and fitted values
+residuals = as.data.frame(cbind(selected_columns_2021, logreg$fitted.values, logreg$residuals))
+p2 = ggplot() + geom_point(data = residuals, aes(x=x1.6, y=(logreg$residuals+x1.6)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x1.6", y ="Residuals + x1.6")
+p3 = ggplot() + geom_point(data = logreg, aes(x=x3.2, y=(logreg$residuals+x3.2)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x3.2", y ="Residuals + x3.2")
+p4 = ggplot() + geom_point(data = logreg, aes(x=x5.1, y=(logreg$residuals+x5.1)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x5.1", y ="Residuals + x5.1")
+p5 = ggplot() + geom_point(data = logreg, aes(x=x6.4, y=(logreg$residuals+x6.4)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x6.4", y ="Residuals + x6.4")
+p6 = ggplot() + geom_point(data = logreg, aes(x=x7.3, y=(logreg$residuals+x7.3)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x7.3", y ="Residuals + x7.3")
+
+p7 = ggarrange(p2,p3,p4,p5,p6)
+annotate_figure(p7, fig.lab = "Partial Residual Plots", top = text_grob(" ", color = "red", face = "bold", size = 14), fig.lab.size=14)
+
+p1 = ggplot() + geom_point(data = residuals, aes(x=logreg$fitted.values, y=(logreg$residuals)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "Fitted Values", y ="Residuals", title= "Residuals versus Fitted Values")
+p1
+
+# Check for multicollinearity of explanatory variables
+kable(t(vif(logreg)[,1]))
+```
+
+```{r}
+# Plot of ROLI and HDI over time, by region and by country
+data = read.csv("./data/data_clean.csv")
+data[data$year == "2012-2013", "year"] = "2012.5"
+data[data$year == "2017-2018", "year"] = "2017.5"
+data$year = as.numeric(data$year)
+data$Region = data$region
+average_hdi = data %>% group_by(Region,year) %>% summarise(average_hdi = mean(hdi))
+hdi_region = ggplot(data=average_hdi, aes(x=year, y=average_hdi)) + geom_line(aes(color = Region))+  theme(legend.text = element_text(size = 8)) + labs(title = "Average HDI versus Time, by Region", x= "Time (Years)", y = "Average HDI")
+hdi_country = ggplot(data=data, aes(x=year, y=hdi, group = country, col=Region)) + geom_line()+  theme(legend.text = element_text(size = 8)) + labs(title = "HDI versus Time, by Country", x= "Time (Years)", y = "HDI")
+average_roli = data %>% group_by(Region,year) %>% summarise(average_roli = mean(wjp.rule))
+roli_region = ggplot(data=average_roli, aes(x=year, y=average_roli)) + geom_line(aes(color = Region))+  theme(legend.text = element_text(size = 8)) + labs(title = "Average ROLI versus Time, by Region", x= "Time (Years)", y = "Average ROLI")
+roli_country = ggplot(data=data, aes(x=year, y=wjp.rule, group = country, col=Region)) + geom_line()+  theme(legend.text = element_text(size = 8)) + labs(title = "ROLI versus Time, by Country", x= "Time (Years)", y = "ROLI")
+ggarrange(hdi_region, hdi_country, roli_region, roli_country, ncol = 4, nrow=1, common.legend = TRUE, legend="bottom")
+```
+
+
+```{r}
+# Create Time Mixed Effects Model
+selected_columns = data[, c("country","year", "region", "hdi", "x1.6","x3.2", "x5.1", "x6.4", "x7.3")]
+selected_columns[selected_columns$year == "2012-2013", "year"] = "2012.5"
+selected_columns[selected_columns$year == "2017-2018", "year"] = "2017.5"
+selected_columns$year = as.numeric(selected_columns$year)
+selected_columns$years_from_2000 = selected_columns$year - 2000
+selected_columns = na.omit(selected_columns)
+
+time_mixed_effects = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region+(1+years_from_2000|country),data=selected_columns)
+
+plotFit <- function(TimeCourse, ...)
+ggplot(selected_columns, aes(x = year, y = hdi, col=factor(country))) +
+  geom_point(alpha = 0.5) + facet_wrap(~region,  nrow = 2) + 
+       geom_line(data = cbind(selected_columns, y.hat = predict(time_mixed_effects)), aes(x = year, y = y.hat), ...) + labs(x = "Year", y = "HDI", color = "Country") + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3))
+
+plotFit(time_mixed_effects)
+```
+
+```{r}
+# Check Assumptions of Mixed Effects Model
+tme_residuals = data.frame( "Residuals" = residuals(time_mixed_effects), "Fitted_Values" = fitted(time_mixed_effects))
+
+fitted_resid = ggplot(data = tme_residuals, aes(x=Fitted_Values,y = Residuals)) + geom_point(color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(title= "Residuals versus Fitted Values")
+
+qq_resid = ggplot(tme_residuals, aes(sample = Residuals)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Residuals",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Residuals)")
+
+ggarrange(fitted_resid,qq_resid, ncol = 2)
+
+ranef = ranef(time_mixed_effects)
+
+random_effects_df <- data.frame(
+  Group = rep(rownames(ranef[[1]]), each = nrow(ranef[[1]])),
+  Effect = as.vector(ranef[[1]])
+)
+
+qq_ranef = ggplot(random_effects_df, aes(sample = Effect..Intercept.)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Intercept Random Effects",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Intercept Random Effects)")
+
+qq_ranef_time = ggplot(random_effects_df, aes(sample = Effect.years_from_2000)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Time Random Effects",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Time Random Effects)")
+
+ggarrange(qq_ranef,qq_ranef_time)
+
+```
+
+```{r}
+# Determine Significance of Coefficients
+fixed_effects = as.data.frame(summary(time_mixed_effects)$coefficients)
+
+kable(fixed_effects,  format = "pipe", align = c("l", "c", "c", "c", "c", "c"))%>% kable_styling(full_width = FALSE)
+```
+
+```{r}
+# Importance of insignificant fixed effects
+time_mixed_effects_noinsig = lmer(hdi~years_from_2000+x7.3+region+(1|country),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noinsig)
+
+# Importance of random effects of years
+time_mixed_effects_noYear = lmer(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region+(1|country),data=selected_columns)
+anova(time_mixed_effects,time_mixed_effects_noYear)
+
+# Importance of Mixed Effects model
+time_mixed_effects_noMixed = lm(hdi~years_from_2000+x1.6+x3.2+x5.1+x6.4+x7.3+region,data=selected_columns)
+anova(time_mixed_effects_noYear,time_mixed_effects_noMixed)
+```
+
+```{r}
+data = read.csv("./data/data_clean.csv")
+
+# Impute missing values with of values in the same region
+selected_columns_pca = select(data, c(starts_with("x"), "region"))
+selected_columns_pca = selected_columns_pca %>%
+  rename(x8.7=x8.7..due.process.of.the.law.and.rights.of.the.accused)
+selected_columns_pca_imputed = selected_columns_pca %>%
+  group_by(region) %>%
+  mutate_all(~ ifelse(is.na(.), mean(., na.rm = TRUE), .))
+selected_columns_pca_imputed = selected_columns_pca_imputed[, -c(1,ncol(selected_columns_pca_imputed))]
+
+# Extract Principle Components of Rule of Law Variables
+pca = prcomp(selected_columns_pca_imputed, scale. = TRUE)
+variance_explained = (pca$sdev^2) / sum(pca$sdev^2)
+```
+
+
+```{r}
+# Visualize Principle Components
+PC1and2 = as.data.frame(cbind(pca$x[,c(1,2)], data[, c("country", "year", "hdi")]))
+PC1and2$PC1 = as.numeric(PC1and2$PC1)
+PC1and2$PC2 = as.numeric(PC1and2$PC2)
+PC1and2$Country = PC1and2$country
+p1 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = Country)) + theme(legend.text = element_blank(), legend.key.size = unit(2, 'mm')) + guides(color = guide_legend(ncol = 3)) + labs(title="PC2 versus PC1, by Country")
+p2 = ggplot(data = PC1and2,aes(x=PC1, y=PC2)) + geom_point(aes(color = hdi)) + labs(title="PC2 versus PC1, by HDI")
+
+p1
+p2
+```
+
+
+```{r}
+# Fit mixed linear model with top 5 principal components
+selected_columns_data = data[, c("country","year", "region", "hdi")]
+selected_columns_data[selected_columns_data$year == "2012-2013", "year"] = "2012.5"
+selected_columns_data[selected_columns_data$year == "2017-2018", "year"] = "2017.5"
+selected_columns_data$year = as.numeric(selected_columns_data$year)
+selected_columns_data$years_from_2000 = selected_columns_data$year - 2000
+TopPCs = as.data.frame(cbind(pca$x[,seq(1,5)], selected_columns_data))
+                  
+lm = lm(hdi~years_from_2000+PC1+PC2+PC3+PC4+PC5+region,data=TopPCs)
+
+kable(summary(lm)$coefficients)
+```
+
+```{r}
+# Find significance of including region variable
+lm_noRegion = lm(hdi~years_from_2000+PC1+PC2+PC3+PC4+PC5,data=TopPCs)
+anova(lm, lm_noRegion)
+```
+
+```{r}
+# Determine importance of each variable
+TopPCs_loadings_abs <- abs(pca$rotation[,seq(1,5)])
+TopPCs_loadings_abs_long <- as.data.frame(as.table(TopPCs_loadings_abs))
+colnames(TopPCs_loadings_abs_long) <- c("Variable", "Principal_Component", "Loading")
+ggplot(TopPCs_loadings_abs_long, aes(x = Principal_Component, y = Loading)) +
+  geom_boxplot(outlier.size = 0) +
+  geom_jitter(aes(color = Variable)) +
+  labs(title = "Boxplot of Component Coefficients by Principal Component",
+       x = "Principal Component",
+       y = "Absolute Value of Component Coefficient")
+
+rowSums(TopPCs_loadings_abs)[order(-rowSums(TopPCs_loadings_abs))]
+
+TopPCs_loadings_abs_grouped = as.data.frame(TopPCs_loadings_abs) 
+TopPCs_loadings_abs_grouped$Row_Labels = row.names(TopPCs_loadings_abs)
+TopPCs_loadings_abs_grouped = TopPCs_loadings_abs_grouped %>%
+  mutate(First_Digit = as.numeric(gsub("\\D*(\\d).*", "\\1", TopPCs_loadings_abs_grouped$Row_Labels))) %>%
+  select(-Row_Labels)
+TopPCs_loadings_abs_grouped = TopPCs_loadings_abs_grouped %>%
+  group_by(First_Digit) %>%
+  summarise(across(everything(), sum, na.rm = TRUE)) %>%
+  column_to_rownames(var = "First_Digit")
+
+TopPCs_loadings_abs_grouped = as.data.frame(t(TopPCs_loadings_abs_grouped)) %>% rename("1 (Constraints on Government Powers)" = "1", "2 (Absence of Corruption)" = "2", "3 (Open Government )" = "3", "4 (Fundamental Rights)" = "4", "5 (Order and Security)" = "5", "6(Regulatory Enforcement)" = "6", "7 (Civil Justice)" = "7", "8 (Criminal Justice)" = "8")
+
+df = as.data.frame(colSums(TopPCs_loadings_abs_grouped)[order(-colSums(TopPCs_loadings_abs_grouped))])
+
+names(df) = "Sum of Absolute Values of Component Coefficients"
+
+kable(df)
+```
+
+```{r}
+# Check assumptions of PCA linear model
+lm_residuals = data.frame( "Residuals" = residuals(lm), "Fitted_Values" = fitted(lm))
+
+fitted_resid = ggplot(data = lm_residuals, aes(x=Fitted_Values,y = Residuals)) + geom_point(color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(title= "Residuals versus Fitted Values")
+
+qq_resid = ggplot(lm_residuals, aes(sample = Residuals)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Residuals",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Residuals)")
+
+ggarrange(fitted_resid,qq_resid, ncol = 2)
+```
+
+```{r}
+# load data
+data_clean <- read.csv("data/data_clean.csv")
+
+# get relevant columns: HDI + ROLI overall factors and specific subfactors
+cols <- c("hdi", "year", "country", "region", colnames(data_clean)[39:90])
+
+# extract those columns -- not subsetting by year here
+# remove summary factors
+data <- data_clean[,cols] %>%
+  select(-contains("factor"))
+
+# remove any rows with NA --> all data
+df <- data[complete.cases(data), ]
+
+# data in most recent year - 2021
+df1 <- df[df$year==2021,]
+df1 <- subset(df1, select=-c(year))
+```
+
+Methods: 
+- run using data in a singular year (choose 2021 because most recent year and largest sample size)
+- choose obs from multiple years --> data on all countries available. we have 138 unique countries in dataset, all of them are in 2021 data --> this method is the same as the 1st method. 
+- using the entire entire dataset
+
+# 2021 data
+
+```{r model selection 2021}
+# model with all variables
+model1 <- lm(hdi~.-country, df1)
+
+# backward selection
+model2 <- step(model1, direction="backward", trace=0)
+
+# intercept model
+interceptModel <- lm(hdi~1, df1)
+
+# interaction
+interactionModel <- lm(hdi~.+region*., df1)
+
+# forward selection
+model3 <- step(interceptModel, scope = list(upper = formula(model1)),
+               direction = "forward", trace=0)
+
+# stepwise selection
+model4 <- step(model2, scope = list(lower = formula(interceptModel),
+                                    upper = formula(model1)),
+               direction = "both", trace=0)
+
+# # save models
+# saveRDS(model1, file = "pred_models/model1.rds")
+# saveRDS(model2, file = "pred_models/model2.rds")
+# saveRDS(model3, file = "pred_models/model3.rds")
+# saveRDS(model4, file = "pred_models/model4.rds")
+
+# # load models
+# model1 <- readRDS("pred_models/model1.rds")
+# model2 <- readRDS("pred_models/model2.rds")
+# model3 <- readRDS("pred_models/model3.rds")
+# model4 <- readRDS("pred_models/model4.rds")
+
+summary(model2)$coefficients
+
+# make tables
+summary2021 <- data.frame("AIC" = c(AIC(model1),  
+                                    AIC(model2), AIC(model3), AIC(model4)),
+                          
+                          "BIC" = c(BIC(model1),
+                                    BIC(model2), BIC(model3), BIC(model4)),
+                          
+           "r.squared" = c(summary(model1)$r.squared,
+                           summary(model2)$r.squared, 
+                          summary(model3)$r.squared, summary(model4)$r.squared))
+rownames(summary2021) <- c("all var", "backward selection", "forward selection", "stepwise")
+
+# print table
+kable(summary2021)
+```
+
+
+```{r ridge and lasso using cv.glmnet}
+# get predictors
+X = model.matrix(model2)[,-1]
+
+# fit
+ridge <- cv.glmnet(X, df1$hdi, alpha=0) 
+lasso <- cv.glmnet(X, df1$hdi, alpha=1)
+
+ridge
+lasso
+
+# plot
+plot(ridge)
+plot(lasso)
+
+# best lambda
+ridge$lambda.min
+lasso$lambda.min
+
+# get mse values
+min(ridge$cvm)
+min(lasso$cvm)
+
+# beta trajectories
+matplot(log(ridge$glmnet.fit$lambda,10), 
+        t(ridge$glmnet.fit$beta),
+        type="l",col="gray33",lwd=1, 
+        xlab=expression(log_10(lambda)), 
+        ylab=expression(hat(beta)),
+        main="beta estimates trajectory, ridge")
+abline(h=0)
+
+matplot(log(lasso$glmnet.fit$lambda,10), 
+        t(lasso$glmnet.fit$beta),
+        type="l",col="gray33",lwd=1, 
+        xlab=expression(log_10(lambda)), 
+        ylab=expression(hat(beta)),
+        main="beta estimates trajectory, lasso")
+abline(h=0)
+
+best_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=lasso$lambda.min)
+coef(best_lasso)
+
+remaining_lasso <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=0.05011872)
+coef(remaining_lasso)
+
+best_ridge <- glmnet(x=subset(df,select=-hdi), y=df$hdi, lambda=ridge$lambda.min)
+coef(best_ridge)
+```
+
+```{r lasso using BIC}
+lambda_values <- seq(from = 1e-04, to = 10^4, length.out = 5000)
+bic_values <- numeric(length(lambda_values))
+X <- model.matrix(model2)[,-1]
+Y <- df1$hdi
+
+for (i in seq_along(lambda_values)) {
+  # Using glmnet for Lasso Regression
+  lasso_model <- glmnet(X, df1$hdi, alpha = 1, lambda = lambda_values[i])
+  
+  # Calculate BIC
+  rss <- sum((predict(lasso_model, newx = X, s = "lambda.min") - Y)^2)
+  n <- length(Y)
+  k <- sum(coef(lasso_model, s = "lambda.min") != 0)
+  bic_values[i] <- n * log(rss / n) + k * log(n)
+}
+
+# Find the index of the minimum BIC value
+best_lambda_index <- which.min(bic_values)
+best_lambda <- lambda_values[best_lambda_index]
+
+# Fit the final Lasso Regression model using the selected lambda
+final_lasso_model <- glmnet(X, Y, alpha = 1, lambda = best_lambda)
+
+# Display results
+best_lambda
+coef(final_lasso_model, s = "lambda.min")
+```
