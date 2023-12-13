@@ -7,13 +7,17 @@ output: pdf_document
 
 ```{r library and data}
 library(lme4)
+library(ggplot2)
+library(ggpubr)
+library(lmtest)
+library(sandwich)
+library(knitr)
 
 # load data
-data_clean <- read.csv("data/data_clean.csv")
+data_clean <- read.csv("data_clean.csv")
 
 # subset to 2021 data only
 data_clean_2021 = data_clean[data_clean$year == 2021,]
-#df = data_clean_2021[2:138,]
 df = data_clean_2021
 ```
 
@@ -70,40 +74,60 @@ f8 = cor(df[,83:88], use="na.or.complete")
 f8
 (colSums(f8) - 1)/(ncol(f8) - 1)
 
-# subset data
-#cor(df[, c("x1.6", "x2.1", "x3.2", "x4.2", "x5.2", "x5.3", "x6.4", "x7.5", "x7.3", "x8.5")], use="na.or.complete")
+#subset data and compute correlation on subset
 cor(df[, c("x1.6", "x2.1", "x3.2", "x4.2", "x5.1", "x6.4", "x7.3", "x8.5")], use="na.or.complete")
 
-#correlation removing 2.1
+#correlation with 2.1 removed
 f.decide = cor(df[, c("x1.6", "x3.2", "x4.2", "x5.1", "x6.4", "x7.3", "x8.5")], use="na.or.complete")
 (colSums(f.decide) - 1)/(ncol(f.decide) - 1)
-#left with 1.6, 3.2, 5.1, 6.4, 7.3
-
-# chosen variables - outdated ones
-#cor(df[,c("x3.2", "x5.2", "x5.3", "x7.5", "x8.5")], use="na.or.complete")
 ```
+
 ```{r models using selected vars}
-#sub_df <- df[, c("country", "hdi", "region", "x3.2", "x5.2", "x7.5", "x8.5")]
+#subsetting df with selected variables
 sub_df <- df[, c("country", "hdi", "Region", "x1.6", "x3.2", "x5.1", "x6.4","x7.3")]
 
+#modelling distributions
+f = ggplot(aes(hdi), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of HDI")
+
+a = ggplot(aes(x1.6), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 1.6")
+
+b = ggplot(aes(x3.2), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 3.2")
+
+c = ggplot(aes(x5.1), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 5.1")
+
+d = ggplot(aes(x6.4), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 6.4")
+
+e = ggplot(aes(x7.3), data=sub_df) +
+  geom_histogram(col="white") +
+    labs(title="Distribution of 7.3")
+
+ggarrange(f,a,b,c,d,e, ncol = 3, nrow = 3)
+
+#fit models
+sub_df$Region = factor(sub_df$Region, levels = c("EU + EFTA + North America", "East Asia & Pacific", "Eastern Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "South Asia", "Sub-Saharan Africa")) #releveling region
 summary(mod1 <- lm(hdi~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
-plot(mod1)
+plot(mod1, c(1:3))
+summary(mod4 <- lm(hdi^2~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+plot(mod4, c(1:3))
+
+#calculate robust standard errors for model coefficients
+summary(mod4 <- lm(hdi^2~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+robus = vcovHC(mod4, type = "HC")
+sqrt(diag(robus))
+coeftest(mod4, vcov = vcovHC(mod4, type = "HC"))
 ```
 
-```{r exploratory models - OLD}
-#DISREGARD - THIS IS OLD
-#baseline using overall ROL as predictors
-model0 = lm(hdi ~ wjp.rule + region, data = df)
-plot(model0)
-
-# using the individual categorical averages as predictors
-model1 = lm(hdi~factor.1 +factor.2 +factor.3 +factor.4 +factor.5 +factor.6 +factor.7 + factor.8 + region, data = df)
-plot(model1)
-
-# random intercept and slope model
-model2 = lmer(hdi ~ wjp.rule + (1 + wjp.rule || region), data = df)
-
-model3 = lmer(hdi~factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 + (1 + factor.1 +factor.2 +factor.3 +factor.4+factor.5 +factor.6 +factor.7 + factor.8 || region), data = df)
-
-AIC(model0, model1, model2, model3)
+```{r pretty table}
+summ = summary(mod1 <- lm(hdi~x1.6 + x3.2 + x5.1 + x6.4 + x7.3 + Region, data = sub_df))
+kable(summ$coefficients)
 ```
