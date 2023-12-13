@@ -20,6 +20,7 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(knitr)
+library(car)
 
 data = read.csv("./data/data_clean.csv")
 ```
@@ -76,10 +77,25 @@ p5 = ggplot() + geom_point(data = selected_columns_2021, aes(x=x7.3, y=low_HD)) 
 ggarrange(p1,p2,p3,p4,p5, nrow = 2, ncol=3, labels = c("A","B","C","D","E"))
 ```
 
-Steep slope, more significant
+```{r}
+# Logistic Regression Assumptions
 
-Thereis equation for shift and slope, that can be meaning
+# Check for linearity between explanatory variables and residuals, as well as with residuals and fitted values
+residuals = as.data.frame(cbind(selected_columns_2021, logreg$fitted.values, logreg$residuals))
+p2 = ggplot() + geom_point(data = residuals, aes(x=x1.6, y=(logreg$residuals+x1.6)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x1.6", y ="Residuals + x1.6")
+p3 = ggplot() + geom_point(data = logreg, aes(x=x3.2, y=(logreg$residuals+x3.2)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x3.2", y ="Residuals + x3.2")
+p4 = ggplot() + geom_point(data = logreg, aes(x=x5.1, y=(logreg$residuals+x5.1)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x5.1", y ="Residuals + x5.1")
+p5 = ggplot() + geom_point(data = logreg, aes(x=x6.4, y=(logreg$residuals+x6.4)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x6.4", y ="Residuals + x6.4")
+p6 = ggplot() + geom_point(data = logreg, aes(x=x7.3, y=(logreg$residuals+x7.3)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "x7.3", y ="Residuals + x7.3")
 
+p7 = ggarrange(p2,p3,p4,p5,p6)
+annotate_figure(p7, fig.lab = "Partial Residual Plots", top = text_grob(" ", color = "red", face = "bold", size = 14), fig.lab.size=14)
 
+p1 = ggplot() + geom_point(data = residuals, aes(x=logreg$fitted.values, y=(logreg$residuals)), color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(x = "Fitted Values", y ="Residuals", title= "Residuals versus Fitted Values")
+p1
 
-Try random forest, explain which will trust more. 
+# Check for multicollinearity of explanatory variables
+kable(t(vif(logreg)[,1]))
+
+kable(data.frame("Category" = c("Constraints on Government Powers","Open Government","Order and Security","Regulatory Enforcement","Civil Justice"), "Representative_Variable" = c("Transition of power is subject to the law","Right to information","Crime is effectively controlled","Due process is respected in administrative proceedings","Civil justice is free of corruption"), "Name"=c("x1.6","x3.2","x5.1","x6.4","x7.3")))
+```

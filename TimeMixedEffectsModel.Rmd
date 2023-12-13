@@ -49,7 +49,10 @@ data$Region = data$region
 average_hdi = data %>% group_by(Region,year) %>% summarise(average_hdi = mean(hdi))
 hdi_region = ggplot(data=average_hdi, aes(x=year, y=average_hdi)) + geom_line(aes(color = Region))+  theme(legend.text = element_text(size = 8)) + labs(title = "Average HDI versus Time, by Region", x= "Time (Years)", y = "Average HDI")
 hdi_country = ggplot(data=data, aes(x=year, y=hdi, group = country, col=Region)) + geom_line()+  theme(legend.text = element_text(size = 8)) + labs(title = "HDI versus Time, by Country", x= "Time (Years)", y = "HDI")
-ggarrange(hdi_region, hdi_country, ncol=2, common.legend = TRUE, legend="bottom")
+average_roli = data %>% group_by(Region,year) %>% summarise(average_roli = mean(wjp.rule))
+roli_region = ggplot(data=average_roli, aes(x=year, y=average_roli)) + geom_line(aes(color = Region))+  theme(legend.text = element_text(size = 8)) + labs(title = "Average ROLI versus Time, by Region", x= "Time (Years)", y = "Average ROLI")
+roli_country = ggplot(data=data, aes(x=year, y=wjp.rule, group = country, col=Region)) + geom_line()+  theme(legend.text = element_text(size = 8)) + labs(title = "ROLI versus Time, by Country", x= "Time (Years)", y = "ROLI")
+ggarrange(hdi_region, hdi_country, roli_region, roli_country, ncol = 4, nrow=1, common.legend = TRUE, legend="bottom")
 ```
 
 
@@ -73,7 +76,39 @@ ggplot(selected_columns, aes(x = year, y = hdi, col=factor(country))) +
 plotFit(time_mixed_effects)
 ```
 
-The coefficients from the fixed effects are as follows:
+```{r}
+tme_residuals = data.frame( "Residuals" = residuals(time_mixed_effects), "Fitted_Values" = fitted(time_mixed_effects))
+
+fitted_resid = ggplot(data = tme_residuals, aes(x=Fitted_Values,y = Residuals)) + geom_point(color = "#1a84b8", alpha = 0.5) + geom_hline(yintercept=0)+ labs(title= "Residuals versus Fitted Values")
+
+qq_resid = ggplot(tme_residuals, aes(sample = Residuals)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Residuals",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Residuals)")
+
+ggarrange(fitted_resid,qq_resid, ncol = 2)
+
+ranef = ranef(time_mixed_effects)
+
+random_effects_df <- data.frame(
+  Group = rep(rownames(ranef[[1]]), each = nrow(ranef[[1]])),
+  Effect = as.vector(ranef[[1]])
+)
+
+qq_ranef = ggplot(random_effects_df, aes(sample = Effect..Intercept.)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Intercept Random Effects",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Intercept Random Effects)")
+
+qq_ranef_time = ggplot(random_effects_df, aes(sample = Effect.years_from_2000)) +
+  geom_qq(color = "#1a84b8", alpha = 0.5) +
+  geom_qq_line() +
+  labs(title = "QQ Plot for Time Random Effects",x = "Theoretical Quantiles (Standard Normal)", y = "Observed Quantiles (Time Random Effects)")
+
+ggarrange(qq_ranef,qq_ranef_time)
+
+```
+
 
 ```{r}
 # Determine Significance of Coefficients
